@@ -1,0 +1,27 @@
+.dash{
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: auto;
+}
+
+.score, .level{
+    display: flex;
+    align-items: center;
+}
+
+@media (max-width: 500px) {
+  .score,
+  .level {
+    display: block;
+    /* align-items: flex-start; optional */
+    align-items: baseline;
+  }
+  #sound{
+    display: none;
+  }
+  h3{
+    margin: 1px;
+  }
+}

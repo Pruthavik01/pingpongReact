@@ -1,0 +1,20 @@
+.canvadiv {
+    width: 60%;
+    aspect-ratio: 16 / 9;  
+    margin: auto;
+    text-align: center;
+}
+
+#canvas{
+    margin: auto;
+    margin-top: 1rem;
+    width: 100%;            
+    height: 100%;
+    background: #000;
+    border-radius: 1rem;
+    display: block;
+}
+
+.live{
+    color: red;
+}
