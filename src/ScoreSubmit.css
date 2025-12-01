@@ -1,0 +1,47 @@
+#gameOverForm {
+    justify-items: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(20, 20, 20, 0.9);
+  padding: 9px;
+  border-radius: 10px;
+  animation: fade 0.3s ease-in-out;
+}
+
+@keyframes fade {
+  from { opacity: 0; transform: translate(-50%, -40%); }
+  to   { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+.score-row{
+    display: flex;
+}
+.submit-row{
+    display: flex;
+    margin-bottom: 1rem;
+}
+
+#gameOverForm input{
+    border: none;
+    border-radius: 5px;
+    padding: 7px;
+    margin: 4px;
+}
+
+#submitScore,#restart{
+    padding: 7px;
+    border-radius: 8px;
+    border: none;
+    background-color: #00A63E;
+    cursor: pointer;
+}
+
+h2,h3{
+    margin: 5px;
+}
+
+button:active{
+  transform: scale(0.98);
+}

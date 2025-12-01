@@ -6,7 +6,7 @@
     margin: auto;
 }
 
-.score, .level{
+.score,.level{
     display: flex;
     align-items: center;
 }
@@ -24,4 +24,15 @@
   h3{
     margin: 1px;
   }
+}
+
+.leaderboard{
+    position: absolute;
+    top: 2%;
+    left: 1%;
+    padding: 1rem;
+    /* background-color: transparent; */
+    border: none;
+    border-radius: 4px;
+    background: rgba(47, 47, 47, 0.7);
 }

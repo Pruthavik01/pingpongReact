@@ -3,14 +3,83 @@ import Dashboard from "./Dashboard"
 import "./GameArea.css"
 
 export default function GameArea() {
+    const [gameStarted, setGameStarted] = useState(false);
     const canvasRef = useRef(null);
     const scoreRef = useRef(null);
     const levelRef = useRef(null);
+    const [gameOver, setGameOver] = useState(false);
+    const gameOverRef = useRef(false);
+    const [restartKey, setRestartKey] = useState(0);
+    // Refs
+    const paddleHitSound = useRef();
+    const wallHitSound = useRef();
+    const gameOverSound = useRef();
+
+    // Cooldowns
+    const lastHitAt = useRef(0);
+
+    // Unlock flag
+    const audioUnlocked = useRef(false);
+
+
+    useEffect(() => {
+        paddleHitSound.current = new Audio("/sounds/hit_paddle.mp3");
+        wallHitSound.current = new Audio("/sounds/hit_wall.mp3");
+        gameOverSound.current = new Audio("/sounds/game_over.mp3");
+    }, []);
+
+
+    useEffect(() => {
+        function unlockAudio() {
+            if (audioUnlocked.current) return;
+
+            [paddleHitSound, wallHitSound, gameOverSound].forEach(s => {
+                if (!s.current) return;
+                s.current.play().catch(() => { });
+                s.current.pause();
+                s.current.currentTime = 0;
+            });
+
+            audioUnlocked.current = true;
+            document.removeEventListener("click", unlockAudio);
+        }
+
+        document.addEventListener("click", unlockAudio);
+    }, []);
+
+    function playSound(ref, cooldown = 40) {
+        if (!audioUnlocked.current) return;
+        if (!ref.current) return;
+
+        const now = performance.now();
+        if (now - lastHitAt.current < cooldown) return;
+
+        lastHitAt.current = now;
+
+        try {
+            ref.current.currentTime = 0;
+            ref.current.play();
+        } catch { }
+    }
+
+
+    function restartGame() {
+        setRestartKey(prev => prev + 1);  // reinitialize game
+        setGameOver(false);               // hide score popup
+        setLives(3);                      // reset lives
+    }
+
+    useEffect(() => {
+        gameOverRef.current = gameOver;
+    }, [gameOver]);
+
+
     const [lives, setLives] = useState(3);
-    // const livesRef = useRef([null, null, null]);
+
     const soundRef = useRef(null);
 
     useEffect(() => {
+        if (!gameStarted) return; // Do NOT run game logic unless started!
         const canvas = canvasRef.current;
         const ctx = canvas.getContext("2d");
 
@@ -90,10 +159,12 @@ export default function GameArea() {
         // collision helpers
         function ballCollisionWithWalls(ball) {
             if (ball.pos.y + ball.radius >= ch) {
+                playSound(wallHitSound, 40);
                 ball.velocity.y *= -1;
                 ball.pos.y = ch - ball.radius;
             }
             if (ball.pos.y - ball.radius <= 0) {
+                playSound(wallHitSound, 40);
                 ball.velocity.y *= -1;
                 ball.pos.y = ball.radius;
             }
@@ -121,6 +192,8 @@ export default function GameArea() {
             const isColliding = dist2 <= r2;
 
             if (isColliding) {
+                playSound(paddleHitSound, 60);
+
                 if (ball.lastHit === paddle) return;
                 ball.lastHit = paddle;
 
@@ -201,13 +274,13 @@ export default function GameArea() {
 
         const TRAIL_MAX = 12;
         const trail = [];
-        const ball = new Ball(vec2(100, 100), vec2(7, 7), ch*0.02);
+        const ball = new Ball(vec2(100, 100), vec2(7, 7), ch * 0.02);
         const paddle1 = new Paddle(vec2(5, ch * 0.4), cw * 0.01, ch * 0.2, "#3498DB");
         const paddle2 = new Paddle(vec2(cw - cw * 0.02, ch * 0.4), cw * 0.01, ch * 0.2, "#E74C3C");
 
         let internalLives = 3;
 
-        let gameOver = false;
+
 
         function resetBall(toLeft = true) {
             ball.pos.x = 100;
@@ -274,13 +347,14 @@ export default function GameArea() {
         }
 
         function gameUpdate() {
-            if (gameOver) return;
+            if (gameOverRef.current) return;
             ball.update();
             if (ball.pos.x - ball.radius <= 0) {
                 internalLives--;
                 setLives(internalLives);
                 if (internalLives <= 0) {
-                    gameOver = true;
+                    playSound(gameOverSound, 60);
+                    setGameOver(true);
                     return;
                 } else {
                     resetBall(false);
@@ -309,10 +383,8 @@ export default function GameArea() {
         function loop() {
             ctx.clearRect(0, 0, cw, ch);
             boardStyle();
-            if (gameOver) {
-                ctx.fillStyle = "#fff";
-                ctx.font = `${cw*0.08}px Arial`;
-                ctx.fillText("GAME OVER", cw/4, ch/2);
+            if (gameOverRef.current === true) {
+                ctx.clearRect(0, 0, cw, ch);
                 return;
             }
             gameUpdate();
@@ -343,12 +415,31 @@ export default function GameArea() {
             window.removeEventListener("resize", onResize);
             if (soundRef.current) soundRef.current.removeEventListener("click", onSoundClick);
         };
-    }, []); // run once
+    },[restartKey, gameStarted]); // run once
+
 
     return (
         <div className="canvadiv">
-            <canvas id="canvas" ref={canvasRef}></canvas>
-            <Dashboard scoreRef={scoreRef} levelRef={levelRef} lives={lives} soundRef={soundRef} />
+
+            {!gameStarted && (
+                <button className="start-btn" onClick={() => setGameStarted(true)}>
+                    Start Game
+                </button>
+            )}
+
+            {gameStarted && (
+                <canvas id="canvas" ref={canvasRef}></canvas>
+            )}
+
+            <Dashboard
+                scoreRef={scoreRef}
+                levelRef={levelRef}
+                lives={lives}
+                soundRef={soundRef}
+                gameOver={gameOver}
+                restartGame={restartGame}
+            />
+
         </div>
     );
 }

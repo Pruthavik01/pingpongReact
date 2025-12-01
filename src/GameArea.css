@@ -18,3 +18,12 @@
 .live{
     color: red;
 }
+
+.start-btn{
+    padding: 1%;
+    background-color: red;
+    border: none;
+    border-radius: 5px;
+    font-size: medium;
+    font-weight: bold;
+}
