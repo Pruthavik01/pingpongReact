@@ -14,6 +14,8 @@ export default function GameArea() {
     const paddleHitSound = useRef();
     const wallHitSound = useRef();
     const gameOverSound = useRef();
+    const soundEnabled = useRef(true);
+
 
     // Cooldowns
     const lastHitAt = useRef(0);
@@ -24,7 +26,7 @@ export default function GameArea() {
 
     useEffect(() => {
         paddleHitSound.current = new Audio("/sounds/hit_paddle.mp3");
-        wallHitSound.current = new Audio("/sounds/hit_wall.mp3");
+        wallHitSound.current = new Audio("/sounds/hit_wall2.mp3");
         gameOverSound.current = new Audio("/sounds/game_over.mp3");
     }, []);
 
@@ -48,6 +50,7 @@ export default function GameArea() {
     }, []);
 
     function playSound(ref, cooldown = 40) {
+        if (!soundEnabled.current) return;
         if (!audioUnlocked.current) return;
         if (!ref.current) return;
 
@@ -59,7 +62,9 @@ export default function GameArea() {
         try {
             ref.current.currentTime = 0;
             ref.current.play();
-        } catch { }
+        } catch (e) {
+            console.log(e);
+        }
     }
 
 
@@ -321,6 +326,9 @@ export default function GameArea() {
         // sound toggle
         function onSoundClick() {
             if (!soundRef.current) return;
+
+            soundEnabled.current = !soundEnabled.current;
+
             soundRef.current.classList.toggle("fa-volume-high");
             soundRef.current.classList.toggle("fa-volume-xmark");
         }
@@ -415,7 +423,7 @@ export default function GameArea() {
             window.removeEventListener("resize", onResize);
             if (soundRef.current) soundRef.current.removeEventListener("click", onSoundClick);
         };
-    },[restartKey, gameStarted]); // run once
+    }, [restartKey, gameStarted]); // run once
 
 
     return (
