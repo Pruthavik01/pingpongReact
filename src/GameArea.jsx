@@ -10,12 +10,13 @@ export default function GameArea() {
     const [gameOver, setGameOver] = useState(false);
     const gameOverRef = useRef(false);
     const [restartKey, setRestartKey] = useState(0);
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    
     // Refs
     const paddleHitSound = useRef();
     const wallHitSound = useRef();
     const gameOverSound = useRef();
     const soundEnabled = useRef(true);
-
 
     // Cooldowns
     const lastHitAt = useRef(0);
@@ -23,13 +24,11 @@ export default function GameArea() {
     // Unlock flag
     const audioUnlocked = useRef(false);
 
-
     useEffect(() => {
         paddleHitSound.current = new Audio("/sounds/hit_paddle.mp3");
         wallHitSound.current = new Audio("/sounds/hit_wall2.mp3");
         gameOverSound.current = new Audio("/sounds/game_over.mp3");
     }, []);
-
 
     useEffect(() => {
         function unlockAudio() {
@@ -47,6 +46,16 @@ export default function GameArea() {
         }
 
         document.addEventListener("click", unlockAudio);
+    }, []);
+
+    // Track mobile state on resize
+    useEffect(() => {
+        function handleResize() {
+            setIsMobile(window.innerWidth <= 768);
+        }
+        
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
     function playSound(ref, cooldown = 40) {
@@ -67,18 +76,15 @@ export default function GameArea() {
         }
     }
 
-
     function restartGame() {
-        setRestartKey(prev => prev + 1);  // reinitialize game
-        setGameOver(false);               // hide score popup
-        setLives(3);                      // reset lives
+        setRestartKey(prev => prev + 1);
+        setGameOver(false);
+        setLives(3);
 
-        // Reset score display
         if (scoreRef.current) {
             scoreRef.current.textContent = 0;
         }
 
-        // Reset level display
         if (levelRef.current) {
             levelRef.current.textContent = 1;
         }
@@ -88,32 +94,28 @@ export default function GameArea() {
         gameOverRef.current = gameOver;
     }, [gameOver]);
 
-
     const [lives, setLives] = useState(3);
-
     const soundRef = useRef(null);
 
     useEffect(() => {
-        if (!gameStarted) return; // Do NOT run game logic unless started!
+        if (!gameStarted) return;
+        
         const canvas = canvasRef.current;
         const ctx = canvas.getContext("2d");
 
         const rect = canvas.getBoundingClientRect();
 
-        const cw = rect.width;     // real width from CSS
-        const ch = rect.height;    // real height from CSS
+        let cw = rect.width;
+        let ch = rect.height;
 
         let dpr = window.devicePixelRatio || 1;
         let coordY = ch / 2;
+        let coordX = cw / 2;
 
         function resizeCanvasToDisplaySize() {
-            // compute CSS size (take parent or explicit size)
-            const parent = canvas.parentElement;
-            if (parent) {
-                const rect = parent.getBoundingClientRect();
-                // cw = Math.max(300, rect.width);
-                // ch = Math.max(200, rect.height);
-            }
+            const rect = canvas.getBoundingClientRect();
+            cw = rect.width;
+            ch = rect.height;
 
             dpr = window.devicePixelRatio || 1;
             canvas.style.width = cw + "px";
@@ -173,31 +175,54 @@ export default function GameArea() {
 
         // collision helpers
         function ballCollisionWithWalls(ball) {
-            if (ball.pos.y + ball.radius >= ch) {
-                playSound(wallHitSound, 40);
-                ball.velocity.y *= -1;
-                ball.pos.y = ch - ball.radius;
-            }
-            if (ball.pos.y - ball.radius <= 0) {
-                playSound(wallHitSound, 40);
-                ball.velocity.y *= -1;
-                ball.pos.y = ball.radius;
+            if (isMobile) {
+                // Vertical mode: bounce off left/right walls
+                if (ball.pos.x + ball.radius >= cw) {
+                    playSound(wallHitSound, 40);
+                    ball.velocity.x *= -1;
+                    ball.pos.x = cw - ball.radius;
+                }
+                if (ball.pos.x - ball.radius <= 0) {
+                    playSound(wallHitSound, 40);
+                    ball.velocity.x *= -1;
+                    ball.pos.x = ball.radius;
+                }
+            } else {
+                // Horizontal mode: bounce off top/bottom walls
+                if (ball.pos.y + ball.radius >= ch) {
+                    playSound(wallHitSound, 40);
+                    ball.velocity.y *= -1;
+                    ball.pos.y = ch - ball.radius;
+                }
+                if (ball.pos.y - ball.radius <= 0) {
+                    playSound(wallHitSound, 40);
+                    ball.velocity.y *= -1;
+                    ball.pos.y = ball.radius;
+                }
             }
         }
 
         function paddleCollisionWithWall(paddle) {
-            if (paddle.pos.y < 0) paddle.pos.y = 0;
-            if (paddle.pos.y + paddle.height > ch) paddle.pos.y = ch - paddle.height;
+            if (isMobile) {
+                // Vertical mode: constrain X
+                if (paddle.pos.x < 0) paddle.pos.x = 0;
+                if (paddle.pos.x + paddle.width > cw) paddle.pos.x = cw - paddle.width;
+            } else {
+                // Horizontal mode: constrain Y
+                if (paddle.pos.y < 0) paddle.pos.y = 0;
+                if (paddle.pos.y + paddle.height > ch) paddle.pos.y = ch - paddle.height;
+            }
         }
 
         function updateScoreDisplay(paddle) {
             if (scoreRef.current) scoreRef.current.textContent = paddle.score;
         }
+        
         function updateLevelDisplay(paddle) {
             if (levelRef.current) levelRef.current.textContent = paddle.level;
         }
 
-        function ballPaddleCollision(ball, paddle, isLeftPaddle) {
+        function ballPaddleCollision(ball, paddle, isPlayerPaddle) {
             const nearestX = clamp(ball.pos.x, paddle.pos.x, paddle.pos.x + paddle.width);
             const nearestY = clamp(ball.pos.y, paddle.pos.y, paddle.pos.y + paddle.height);
             const dx = ball.pos.x - nearestX;
@@ -212,30 +237,50 @@ export default function GameArea() {
                 if (ball.lastHit === paddle) return;
                 ball.lastHit = paddle;
 
-                const relativeY = (ball.pos.y - (paddle.pos.y + paddle.height / 2)) / (paddle.height / 2);
-                const maxBounce = Math.PI / 3;
-                const bounceAngle = clamp(relativeY, -1, 1) * maxBounce;
-
                 const speed = Math.hypot(ball.velocity.x, ball.velocity.y) || 5;
-                const dirX = isLeftPaddle ? 1 : -1;
 
-                ball.velocity.x = dirX * Math.cos(bounceAngle) * speed;
-                ball.velocity.y = Math.sin(bounceAngle) * speed;
+                if (isMobile) {
+                    // Vertical mode: paddle at bottom/top
+                    const relativeX = (ball.pos.x - (paddle.pos.x + paddle.width / 2)) / (paddle.width / 2);
+                    const maxBounce = Math.PI / 3;
+                    const bounceAngle = clamp(relativeX, -1, 1) * maxBounce;
 
-                if (isLeftPaddle) {
-                    ball.pos.x = paddle.pos.x + paddle.width + ball.radius + 0.5;
+                    const dirY = isPlayerPaddle ? -1 : 1; // Player at bottom shoots up
+
+                    ball.velocity.x = Math.sin(bounceAngle) * speed;
+                    ball.velocity.y = dirY * Math.cos(bounceAngle) * speed;
+
+                    if (isPlayerPaddle) {
+                        ball.pos.y = paddle.pos.y - ball.radius - 0.5;
+                    } else {
+                        ball.pos.y = paddle.pos.y + paddle.height + ball.radius + 0.5;
+                    }
                 } else {
-                    ball.pos.x = paddle.pos.x - ball.radius - 0.5;
+                    // Horizontal mode: paddle at left/right
+                    const relativeY = (ball.pos.y - (paddle.pos.y + paddle.height / 2)) / (paddle.height / 2);
+                    const maxBounce = Math.PI / 3;
+                    const bounceAngle = clamp(relativeY, -1, 1) * maxBounce;
+
+                    const dirX = isPlayerPaddle ? 1 : -1; // Player at left shoots right
+
+                    ball.velocity.x = dirX * Math.cos(bounceAngle) * speed;
+                    ball.velocity.y = Math.sin(bounceAngle) * speed;
+
+                    if (isPlayerPaddle) {
+                        ball.pos.x = paddle.pos.x + paddle.width + ball.radius + 0.5;
+                    } else {
+                        ball.pos.x = paddle.pos.x - ball.radius - 0.5;
+                    }
                 }
 
-                if (isLeftPaddle) {
+                if (isPlayerPaddle) {
                     paddle.score += 1;
                     updateScoreDisplay(paddle);
                     if (paddle.score % 5 === 0) {
                         const signX = ball.velocity.x > 0 ? 1 : -1;
                         const signY = ball.velocity.y > 0 ? 1 : -1;
-                        ball.velocity.x = signX * (Math.abs(ball.velocity.x) + 2);
-                        ball.velocity.y = signY * (Math.abs(ball.velocity.y) + 2);
+                        ball.velocity.x = signX * (Math.abs(ball.velocity.x) + 1);
+                        ball.velocity.y = signY * (Math.abs(ball.velocity.y) + 1);
                         paddle.level += 1;
                         updateLevelDisplay(paddle);
                     }
@@ -246,44 +291,97 @@ export default function GameArea() {
         }
 
         // prediction helper for AI
-        function predictBallHit(ball, targetX, maxSteps = 5000) {
+        function predictBallHit(ball, targetPos, maxSteps = 5000) {
             let simX = ball.pos.x;
             let simY = ball.pos.y;
             let velX = ball.velocity.x;
             let velY = ball.velocity.y;
-            if (velX === 0) return { y: simY, steps: 1 };
-            const wantToTheRight = targetX >= simX;
-            for (let step = 0; step < maxSteps; step++) {
-                simX += velX;
-                simY += velY;
-                if (simY - ball.radius <= 0) { simY = ball.radius; velY *= -1; }
-                if (simY + ball.radius >= ch) { simY = ch - ball.radius; velY *= -1; }
-                if ((wantToTheRight && simX >= targetX) || (!wantToTheRight && simX <= targetX)) {
-                    return { y: simY, steps: step + 1 };
+
+            if (isMobile) {
+                // Vertical mode: predict X position when ball reaches targetPos Y
+                if (velY === 0) return { x: simX, steps: 1 };
+                const wantUp = targetPos <= simY;
+                
+                for (let step = 0; step < maxSteps; step++) {
+                    simX += velX;
+                    simY += velY;
+                    
+                    // Bounce off left/right walls
+                    if (simX - ball.radius <= 0) { simX = ball.radius; velX *= -1; }
+                    if (simX + ball.radius >= cw) { simX = cw - ball.radius; velX *= -1; }
+                    
+                    if ((wantUp && simY <= targetPos) || (!wantUp && simY >= targetPos)) {
+                        return { x: simX, steps: step + 1 };
+                    }
                 }
+                return { x: simX, steps: maxSteps };
+            } else {
+                // Horizontal mode: predict Y position when ball reaches targetPos X
+                if (velX === 0) return { y: simY, steps: 1 };
+                const wantRight = targetPos >= simX;
+                
+                for (let step = 0; step < maxSteps; step++) {
+                    simX += velX;
+                    simY += velY;
+                    
+                    // Bounce off top/bottom walls
+                    if (simY - ball.radius <= 0) { simY = ball.radius; velY *= -1; }
+                    if (simY + ball.radius >= ch) { simY = ch - ball.radius; velY *= -1; }
+                    
+                    if ((wantRight && simX >= targetPos) || (!wantRight && simX <= targetPos)) {
+                        return { y: simY, steps: step + 1 };
+                    }
+                }
+                return { y: simY, steps: maxSteps };
             }
-            return { y: simY, steps: maxSteps };
         }
 
         function player2Ai(ball, paddle) {
-            const interceptX = paddle.pos.x - 1 - ball.radius;
-            const pred = predictBallHit(ball, interceptX, 2000);
-            const predictedY = pred.y;
-            const steps = Math.max(1, pred.steps);
-            const targetY = predictedY - paddle.height / 2;
-            const distance = targetY - paddle.pos.y;
-            const requiredSpeed = Math.abs(distance) / steps;
+            const marginFactor = isMobile ? 1.3 : 1.15;
             const minSpeed = 3;
-            // In player2Ai function, detect mobile and adjust:
-            const isMobile = window.innerWidth <= 768;
-            const marginFactor = isMobile ? 1.25 : 1.15; // Slower AI on mobile
-            const maxSpeed = isMobile ? 25 : 30;
-            const speed = Math.min(maxSpeed, Math.max(minSpeed, requiredSpeed * marginFactor));
-            const dy = targetY - paddle.pos.y;
-            if (Math.abs(dy) > speed) paddle.pos.y += Math.sign(dy) * speed;
-            else paddle.pos.y = targetY;
-            if (paddle.pos.y < 0) paddle.pos.y = 0;
-            if (paddle.pos.y + paddle.height > ch) paddle.pos.y = ch - paddle.height;
+            const maxSpeed = isMobile ? 20 : 30;
+
+            if (isMobile) {
+                // Vertical mode: AI at top, moves left-right
+                const interceptY = paddle.pos.y + paddle.height + 1 + ball.radius;
+                const pred = predictBallHit(ball, interceptY, 2000);
+                const predictedX = pred.x;
+                const steps = Math.max(1, pred.steps);
+                const targetX = predictedX - paddle.width / 2;
+                const distance = targetX - paddle.pos.x;
+                const requiredSpeed = Math.abs(distance) / steps;
+                const speed = Math.min(maxSpeed, Math.max(minSpeed, requiredSpeed * marginFactor));
+                const dx = targetX - paddle.pos.x;
+                
+                if (Math.abs(dx) > speed) {
+                    paddle.pos.x += Math.sign(dx) * speed;
+                } else {
+                    paddle.pos.x = targetX;
+                }
+                
+                if (paddle.pos.x < 0) paddle.pos.x = 0;
+                if (paddle.pos.x + paddle.width > cw) paddle.pos.x = cw - paddle.width;
+            } else {
+                // Horizontal mode: AI at right, moves up-down
+                const interceptX = paddle.pos.x - 1 - ball.radius;
+                const pred = predictBallHit(ball, interceptX, 2000);
+                const predictedY = pred.y;
+                const steps = Math.max(1, pred.steps);
+                const targetY = predictedY - paddle.height / 2;
+                const distance = targetY - paddle.pos.y;
+                const requiredSpeed = Math.abs(distance) / steps;
+                const speed = Math.min(maxSpeed, Math.max(minSpeed, requiredSpeed * marginFactor));
+                const dy = targetY - paddle.pos.y;
+                
+                if (Math.abs(dy) > speed) {
+                    paddle.pos.y += Math.sign(dy) * speed;
+                } else {
+                    paddle.pos.y = targetY;
+                }
+                
+                if (paddle.pos.y < 0) paddle.pos.y = 0;
+                if (paddle.pos.y + paddle.height > ch) paddle.pos.y = ch - paddle.height;
+            }
         }
 
         // --- Initialize ---
@@ -291,20 +389,43 @@ export default function GameArea() {
 
         const TRAIL_MAX = 12;
         const trail = [];
-        const ball = new Ball(vec2(100, 100), vec2(5, 5), ch * 0.02);
-        const paddle1 = new Paddle(vec2(5, ch * 0.4), cw * 0.01, ch * 0.2, "#3498DB");
-        const paddle2 = new Paddle(vec2(cw - cw * 0.02, ch * 0.4), cw * 0.01, ch * 0.2, "#E74C3C");
+        
+        // Different ball speeds for mobile vs desktop
+        const initialSpeed = isMobile ? 3.5 : 7;
+        const ball = new Ball(
+            vec2(cw / 2, ch / 2), 
+            vec2(initialSpeed, initialSpeed), 
+            isMobile ? Math.min(cw, ch) * 0.025 : ch * 0.02
+        );
+        
+        let paddle1, paddle2;
+
+        if (isMobile) {
+            // Vertical mode: player at bottom, AI at top
+            paddle1 = new Paddle(vec2(cw * 0.4, ch - ch * 0.03), cw * 0.2, ch * 0.015, "#3498DB");
+            paddle2 = new Paddle(vec2(cw * 0.4, 5), cw * 0.2, ch * 0.015, "#E74C3C");
+        } else {
+            // Horizontal mode: player at left, AI at right
+            paddle1 = new Paddle(vec2(5, ch * 0.4), cw * 0.01, ch * 0.2, "#3498DB");
+            paddle2 = new Paddle(vec2(cw - cw * 0.02, ch * 0.4), cw * 0.01, ch * 0.2, "#E74C3C");
+        }
 
         let internalLives = 3;
 
-
-
-        function resetBall(toLeft = true) {
-            ball.pos.x = 100;
-            ball.pos.y = Math.random() * 10 + 100;
-            // keep the SAME velocity direction but reset speed if needed
-            ball.velocity.x *= -1;
-            ball.velocity.y *= -1;
+        function resetBall(toPlayer = true) {
+            ball.pos.x = cw / 2;
+            ball.pos.y = ch / 2;
+            
+            const speed = isMobile ? 3.5 : 7;
+            
+            if (isMobile) {
+                ball.velocity.x = (Math.random() - 0.5) * speed * 2;
+                ball.velocity.y = toPlayer ? speed : -speed;
+            } else {
+                ball.velocity.x = toPlayer ? speed : -speed;
+                ball.velocity.y = (Math.random() - 0.5) * speed * 2;
+            }
+            
             trail.length = 0;
         }
 
@@ -324,32 +445,36 @@ export default function GameArea() {
             ctx.restore();
         }
 
-        // handle mouse pointer over canvas
-        // Replace the onMouseMove function and add touch handlers:
-
+        // handle pointer (mouse/touch) over canvas
         function onPointerMove(e) {
-            e.preventDefault(); // Prevent page scrolling
+            e.preventDefault();
             const rect = canvas.getBoundingClientRect();
-            let clientY;
+            let clientX, clientY;
 
             if (e.touches) {
+                clientX = e.touches[0].clientX;
                 clientY = e.touches[0].clientY;
             } else {
+                clientX = e.clientX;
                 clientY = e.clientY;
             }
 
-            coordY = clientY - rect.top;
-            paddle1.pos.y = coordY - paddle1.height / 2;
-            paddleCollisionWithWall(paddle1);
+            if (isMobile) {
+                // Vertical mode: move paddle left-right
+                coordX = clientX - rect.left;
+                paddle1.pos.x = coordX - paddle1.width / 2;
+                paddleCollisionWithWall(paddle1);
+            } else {
+                // Horizontal mode: move paddle up-down
+                coordY = clientY - rect.top;
+                paddle1.pos.y = coordY - paddle1.height / 2;
+                paddleCollisionWithWall(paddle1);
+            }
         }
 
-        // Add both mouse and touch listeners
         canvas.addEventListener("mousemove", onPointerMove);
         canvas.addEventListener("touchmove", onPointerMove, { passive: false });
-
-        // Also add touchstart to initialize position
         canvas.addEventListener("touchstart", onPointerMove, { passive: false });
-
 
         // sound toggle
         function onSoundClick() {
@@ -365,13 +490,23 @@ export default function GameArea() {
 
         // game loop
         let rafId = null;
+        
         function boardStyle() {
             ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
             ctx.lineWidth = 2;
             ctx.setLineDash([5, 5]);
             ctx.beginPath();
-            ctx.moveTo(cw / 2, 0);
-            ctx.lineTo(cw / 2, ch);
+            
+            if (isMobile) {
+                // Vertical: horizontal line in middle
+                ctx.moveTo(0, ch / 2);
+                ctx.lineTo(cw, ch / 2);
+            } else {
+                // Horizontal: vertical line in middle
+                ctx.moveTo(cw / 2, 0);
+                ctx.lineTo(cw / 2, ch);
+            }
+            
             ctx.stroke();
             ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
             ctx.lineWidth = 2;
@@ -384,20 +519,41 @@ export default function GameArea() {
 
         function gameUpdate() {
             if (gameOverRef.current) return;
+            
             ball.update();
-            if (ball.pos.x - ball.radius <= 0) {
-                internalLives--;
-                setLives(internalLives);
-                if (internalLives <= 0) {
-                    playSound(gameOverSound, 60);
-                    setGameOver(true);
-                    return;
-                } else {
-                    resetBall(false);
+
+            if (isMobile) {
+                // Vertical mode: lose if ball goes off bottom
+                if (ball.pos.y + ball.radius >= ch) {
+                    internalLives--;
+                    setLives(internalLives);
+                    if (internalLives <= 0) {
+                        playSound(gameOverSound, 60);
+                        setGameOver(true);
+                        return;
+                    } else {
+                        resetBall(true);
+                    }
                 }
-            }
-            if (ball.pos.x + ball.radius >= cw) {
-                resetBall(true);
+                if (ball.pos.y - ball.radius <= 0) {
+                    resetBall(true);
+                }
+            } else {
+                // Horizontal mode: lose if ball goes off left
+                if (ball.pos.x - ball.radius <= 0) {
+                    internalLives--;
+                    setLives(internalLives);
+                    if (internalLives <= 0) {
+                        playSound(gameOverSound, 60);
+                        setGameOver(true);
+                        return;
+                    } else {
+                        resetBall(true);
+                    }
+                }
+                if (ball.pos.x + ball.radius >= cw) {
+                    resetBall(true);
+                }
             }
 
             trail.unshift({ x: ball.pos.x, y: ball.pos.y });
@@ -432,20 +588,37 @@ export default function GameArea() {
 
         // handle window resize
         function onResize() {
+            const newRect = canvas.getBoundingClientRect();
+            cw = newRect.width;
+            ch = newRect.height;
             resizeCanvasToDisplaySize();
-            // re-position paddles based on new size
-            paddle1.height = ch * 0.2;
-            paddle1.pos.x = 5;
-            paddle2.width = cw * 0.02;
-            paddle2.pos.x = cw - paddle2.width - 5;
-            paddle2.height = ch * 0.2;
-            paddle1.pos.y = clamp(paddle1.pos.y, 0, ch - paddle1.height);
-            paddle2.pos.y = clamp(paddle2.pos.y, 0, ch - paddle2.height);
+
+            if (isMobile) {
+                // Vertical mode
+                paddle1.width = cw * 0.2;
+                paddle1.height = ch * 0.015;
+                paddle1.pos.y = ch - paddle1.height - 5;
+                paddle2.width = cw * 0.2;
+                paddle2.height = ch * 0.015;
+                paddle2.pos.y = 5;
+                paddle1.pos.x = clamp(paddle1.pos.x, 0, cw - paddle1.width);
+                paddle2.pos.x = clamp(paddle2.pos.x, 0, cw - paddle2.width);
+            } else {
+                // Horizontal mode
+                paddle1.height = ch * 0.2;
+                paddle1.width = cw * 0.01;
+                paddle1.pos.x = 5;
+                paddle2.width = cw * 0.02;
+                paddle2.height = ch * 0.2;
+                paddle2.pos.x = cw - paddle2.width - 5;
+                paddle1.pos.y = clamp(paddle1.pos.y, 0, ch - paddle1.height);
+                paddle2.pos.y = clamp(paddle2.pos.y, 0, ch - paddle2.height);
+            }
         }
+        
         window.addEventListener("resize", onResize);
 
         // cleanup
-        // In the cleanup return function, update to:
         return () => {
             cancelAnimationFrame(rafId);
             canvas.removeEventListener("mousemove", onPointerMove);
@@ -454,12 +627,10 @@ export default function GameArea() {
             window.removeEventListener("resize", onResize);
             if (soundRef.current) soundRef.current.removeEventListener("click", onSoundClick);
         };
-    }, [restartKey, gameStarted]); // run once
-
+    }, [restartKey, gameStarted, isMobile]);
 
     return (
         <div className="canvadiv">
-
             {!gameStarted && (
                 <button className="start-btn" onClick={() => setGameStarted(true)}>
                     Start Game
@@ -478,7 +649,6 @@ export default function GameArea() {
                 gameOver={gameOver}
                 restartGame={restartGame}
             />
-
         </div>
     );
 }

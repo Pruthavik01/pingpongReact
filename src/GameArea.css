@@ -1,13 +1,13 @@
 .canvadiv {
-    width: 90%;  /* Wider on mobile */
-    max-width: 800px;  /* Max width for large screens */
+    width: 90%;
+    max-width: 800px;
     aspect-ratio: 16 / 9;  
     margin: auto;
     text-align: center;
     padding: 0 10px;
 }
 
-#canvas{
+#canvas {
     margin: auto;
     margin-top: 1rem;
     width: 100%;            
@@ -18,11 +18,11 @@
     touch-action: none; /* Prevent scrolling while touching canvas */
 }
 
-.live{
+.live {
     color: red;
 }
 
-.start-btn{
+.start-btn {
     padding: 3%;
     background-color: red;
     border: none;
@@ -31,16 +31,38 @@
     font-weight: bold;
     cursor: pointer;
     min-height: 44px; /* Touch-friendly size */
+    transition: background-color 0.3s;
 }
 
-/* Mobile optimizations */
+.start-btn:hover {
+    background-color: #cc0000;
+}
+
+.start-btn:active {
+    background-color: #990000;
+}
+
+/* Mobile: Vertical layout */
 @media (max-width: 768px) {
     .canvadiv {
         width: 95%;
+        max-width: 500px;
+        aspect-ratio: 9 / 16; /* Flip to vertical for mobile */
     }
     
     .start-btn {
         font-size: 1rem;
         padding: 4%;
+    }
+
+    #canvas {
+        margin-top: 0.5rem;
+    }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+    .canvadiv {
+        width: 98%;
     }
 }
