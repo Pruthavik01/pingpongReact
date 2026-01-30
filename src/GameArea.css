@@ -45,9 +45,10 @@
 /* Mobile: Vertical layout */
 @media (max-width: 768px) {
     .canvadiv {
-        width: 95%;
-        max-width: 500px;
+        width: 85%;  /* Smaller width for mobile */
+        max-width: 400px;  /* Reduced max-width */
         aspect-ratio: 9 / 16; /* Flip to vertical for mobile */
+        padding: 0 5px;
     }
     
     .start-btn {
@@ -63,6 +64,7 @@
 /* Very small screens */
 @media (max-width: 480px) {
     .canvadiv {
-        width: 98%;
+        width: 80%;  /* Even smaller for tiny phones */
+        max-width: 350px;
     }
 }
