@@ -72,6 +72,16 @@ export default function GameArea() {
         setRestartKey(prev => prev + 1);  // reinitialize game
         setGameOver(false);               // hide score popup
         setLives(3);                      // reset lives
+
+        // Reset score display
+        if (scoreRef.current) {
+            scoreRef.current.textContent = 0;
+        }
+
+        // Reset level display
+        if (levelRef.current) {
+            levelRef.current.textContent = 1;
+        }
     }
 
     useEffect(() => {
@@ -263,9 +273,11 @@ export default function GameArea() {
             const targetY = predictedY - paddle.height / 2;
             const distance = targetY - paddle.pos.y;
             const requiredSpeed = Math.abs(distance) / steps;
-            const marginFactor = 1.15;
             const minSpeed = 3;
-            const maxSpeed = 30;
+            // In player2Ai function, detect mobile and adjust:
+            const isMobile = window.innerWidth <= 768;
+            const marginFactor = isMobile ? 1.25 : 1.15; // Slower AI on mobile
+            const maxSpeed = isMobile ? 25 : 30;
             const speed = Math.min(maxSpeed, Math.max(minSpeed, requiredSpeed * marginFactor));
             const dy = targetY - paddle.pos.y;
             if (Math.abs(dy) > speed) paddle.pos.y += Math.sign(dy) * speed;
@@ -279,7 +291,7 @@ export default function GameArea() {
 
         const TRAIL_MAX = 12;
         const trail = [];
-        const ball = new Ball(vec2(100, 100), vec2(7, 7), ch * 0.02);
+        const ball = new Ball(vec2(100, 100), vec2(5, 5), ch * 0.02);
         const paddle1 = new Paddle(vec2(5, ch * 0.4), cw * 0.01, ch * 0.2, "#3498DB");
         const paddle2 = new Paddle(vec2(cw - cw * 0.02, ch * 0.4), cw * 0.01, ch * 0.2, "#E74C3C");
 
@@ -313,15 +325,31 @@ export default function GameArea() {
         }
 
         // handle mouse pointer over canvas
-        function onMouseMove(e) {
+        // Replace the onMouseMove function and add touch handlers:
+
+        function onPointerMove(e) {
+            e.preventDefault(); // Prevent page scrolling
             const rect = canvas.getBoundingClientRect();
-            coordY = e.clientY - rect.top;
-            // center paddle1 on mouse
+            let clientY;
+
+            if (e.touches) {
+                clientY = e.touches[0].clientY;
+            } else {
+                clientY = e.clientY;
+            }
+
+            coordY = clientY - rect.top;
             paddle1.pos.y = coordY - paddle1.height / 2;
             paddleCollisionWithWall(paddle1);
         }
 
-        canvas.addEventListener("mousemove", onMouseMove);
+        // Add both mouse and touch listeners
+        canvas.addEventListener("mousemove", onPointerMove);
+        canvas.addEventListener("touchmove", onPointerMove, { passive: false });
+
+        // Also add touchstart to initialize position
+        canvas.addEventListener("touchstart", onPointerMove, { passive: false });
+
 
         // sound toggle
         function onSoundClick() {
@@ -417,9 +445,12 @@ export default function GameArea() {
         window.addEventListener("resize", onResize);
 
         // cleanup
+        // In the cleanup return function, update to:
         return () => {
             cancelAnimationFrame(rafId);
-            canvas.removeEventListener("mousemove", onMouseMove);
+            canvas.removeEventListener("mousemove", onPointerMove);
+            canvas.removeEventListener("touchmove", onPointerMove);
+            canvas.removeEventListener("touchstart", onPointerMove);
             window.removeEventListener("resize", onResize);
             if (soundRef.current) soundRef.current.removeEventListener("click", onSoundClick);
         };

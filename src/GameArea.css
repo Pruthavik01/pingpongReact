@@ -1,8 +1,10 @@
 .canvadiv {
-    width: 60%;
+    width: 90%;  /* Wider on mobile */
+    max-width: 800px;  /* Max width for large screens */
     aspect-ratio: 16 / 9;  
     margin: auto;
     text-align: center;
+    padding: 0 10px;
 }
 
 #canvas{
@@ -13,6 +15,7 @@
     background: #000;
     border-radius: 1rem;
     display: block;
+    touch-action: none; /* Prevent scrolling while touching canvas */
 }
 
 .live{
@@ -20,10 +23,24 @@
 }
 
 .start-btn{
-    padding: 1%;
+    padding: 3%;
     background-color: red;
     border: none;
     border-radius: 5px;
-    font-size: medium;
+    font-size: 1.2rem;
     font-weight: bold;
+    cursor: pointer;
+    min-height: 44px; /* Touch-friendly size */
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+    .canvadiv {
+        width: 95%;
+    }
+    
+    .start-btn {
+        font-size: 1rem;
+        padding: 4%;
+    }
 }
